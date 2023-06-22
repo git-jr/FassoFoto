@@ -10,15 +10,16 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.paradoxo.fassofoto.databinding.ActivityCameraXactivityBinding
+import com.paradoxo.fassofoto.extensions.showToast
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -31,37 +32,53 @@ class CameraXActivity : androidx.activity.ComponentActivity() {
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
 
-    private val fileOpenResultLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-            uri?.let {
-                Toast.makeText(this, "File selected: $uri", Toast.LENGTH_SHORT).show()
-            }
+    private val pickImagesLauncher = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris: List<Uri>? ->
+        uris?.let {
+            Toast.makeText(this, "Files selected: ${uris.size}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (allPermissionsGranted()) {
+            startCamera()
+        } else {
+            showToast("Não será possivel usar o app sem essa permissão")
+            finish()
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityCameraXactivityBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
 
-        // Request camera permissions
         if (allPermissionsGranted()) {
             startCamera()
         } else {
-            ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
-            )
+            requestPermissionsLauncher.launch(REQUIRED_PERMISSIONS)
         }
 
+        setTakePhotoButton()
+        setShownButtonImages()
 
-        // Set up the listeners for take photo and video capture buttons
+        cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    private fun setShownButtonImages() {
+        viewBinding.videoCaptureButton.setOnClickListener {
+            showRecentPhotos()
+        }
+    }
+
+    private fun setTakePhotoButton() {
         viewBinding.imageCaptureButton.setOnClickListener {
             takePhoto()
         }
-        viewBinding.videoCaptureButton.setOnClickListener {
-            showTakedPhotos()
-        }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
     private fun takePhoto() {
@@ -74,7 +91,7 @@ class CameraXActivity : androidx.activity.ComponentActivity() {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FassoFoto")
             }
         }
 
@@ -100,10 +117,9 @@ class CameraXActivity : androidx.activity.ComponentActivity() {
             })
     }
 
-    private fun showTakedPhotos() {
-        fileOpenResultLauncher.launch(arrayOf("image/*"))
+    private fun showRecentPhotos() {
+        pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
-
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
@@ -138,27 +154,10 @@ class CameraXActivity : androidx.activity.ComponentActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
             baseContext, it
         ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE_PERMISSIONS) {
-            if (allPermissionsGranted()) {
-                startCamera()
-            } else {
-                Toast.makeText(
-                    this, "Permissions not granted by the user.", Toast.LENGTH_SHORT
-                ).show()
-                finish()
-            }
-        }
     }
 
     override fun onDestroy() {
@@ -167,11 +166,10 @@ class CameraXActivity : androidx.activity.ComponentActivity() {
     }
 
     companion object {
-        private const val TAG = "CameraXApp"
+        private const val TAG = "FassoFoto"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
-        private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
+            Manifest.permission.CAMERA
         ).apply {
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                 add(WRITE_EXTERNAL_STORAGE)

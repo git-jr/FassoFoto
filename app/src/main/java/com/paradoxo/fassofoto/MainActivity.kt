@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val context = LocalContext.current
-                    ButtonSelectorScreen(
+                    SelectorButtonScreen(
                         openNormalActivity = {
                             startActivity(Intent(this, CameraXActivity::class.java))
                         },
@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ButtonSelectorScreen(
+fun SelectorButtonScreen(
     modifier: Modifier = Modifier,
     openComposeCameraActiviy: () -> Unit = {},
     openNormalActivity: () -> Unit = {}
@@ -80,9 +80,9 @@ fun ButtonSelectorScreen(
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+fun SelectorButtonScreenPreview() {
     FassoFotoTheme {
-        ButtonSelectorScreen()
+        SelectorButtonScreen()
     }
 }
 
